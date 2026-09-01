@@ -10,13 +10,23 @@ const verifyUserToken = async (req, res, next) => {
       return res.status(400).json({ message: 'User ID route parameter is required' });
     }
 
-    // Cookie name convention required: Token_<userId>
+    // 1. Try reading cookie Token_<userId>
     const cookieName = `Token_${paramUserId}`;
-    const token = req.cookies[cookieName];
+    let token = req.cookies[cookieName];
+
+    // 2. Fallback to Authorization headers if browser blocks 3rd-party cookies across domains
+    if (!token) {
+      const authHeader = req.headers.authorization || req.headers['authorization'];
+      if (authHeader) {
+        token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : authHeader;
+      } else if (req.headers[`x-token-${paramUserId}`]) {
+        token = req.headers[`x-token-${paramUserId}`];
+      }
+    }
 
     if (!token) {
       return res.status(401).json({ 
-        message: `Unauthorized. Authentication token cookie '${cookieName}' missing or expired.` 
+        message: `Unauthorized. Token cookie '${cookieName}' or Authorization header missing or expired.` 
       });
     }
 

@@ -44,6 +44,9 @@ const LoginRegister = ({ onLoginSuccess }) => {
         });
 
         if (res.data.success) {
+          if (res.data.token && res.data.user?._id) {
+            sessionStorage.setItem(`cms_token_${res.data.user._id}`, res.data.token);
+          }
           onLoginSuccess(res.data.user);
         }
       }
