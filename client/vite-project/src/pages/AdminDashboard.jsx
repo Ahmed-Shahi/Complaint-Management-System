@@ -47,6 +47,7 @@ const AdminDashboard = ({ user }) => {
   // Selected Complaint for Status Update Modal
   const [selectedComplaint, setSelectedComplaint] = useState(null);
   const [updateStatus, setUpdateStatus] = useState('');
+  const [updateSubject, setUpdateSubject] = useState('');
   const [adminComment, setAdminComment] = useState('');
   const [updatingComplaint, setUpdatingComplaint] = useState(false);
 
@@ -184,17 +185,20 @@ const AdminDashboard = ({ user }) => {
   const handleOpenComplaintModal = (item) => {
     setSelectedComplaint(item);
     setUpdateStatus(item.status);
+    setUpdateSubject(item.title || '');
     setAdminComment(item.adminComment || '');
   };
 
   const handleSaveComplaintStatus = async (e) => {
     e.preventDefault();
-    if (!selectedComplaint) return;
+    const userId = getUserId();
+    if (!selectedComplaint || !userId) return;
     setUpdatingComplaint(true);
 
     try {
-      const res = await API.patch(`/complaints/${user._id}/status/${selectedComplaint._id}`, {
+      const res = await API.patch(`/complaints/${userId}/status/${selectedComplaint._id}`, {
         status: updateStatus,
+        title: updateSubject,
         adminComment: adminComment
       });
 
@@ -480,24 +484,24 @@ const AdminDashboard = ({ user }) => {
                           <StatusBadge status={u.status} />
                         </td>
                         <td>
-                          {u._id !== user._id ? (
-                            u.status === 'ACTIVE' ? (
-                              <button
-                                className="btn-secondary btn-sm"
-                                onClick={() => handleUserStatusUpdate(u._id, 'DEACTIVATED')}
-                              >
-                                <UserX size={14} style={{ marginRight: '4px' }} /> Deactivate
-                              </button>
-                            ) : (
-                              <button
-                                className="btn-outline btn-sm"
-                                onClick={() => handleUserStatusUpdate(u._id, 'ACTIVE')}
-                              >
-                                <UserCheck size={14} style={{ marginRight: '4px' }} /> Activate
-                              </button>
-                            )
+                          {u.role === 'ADMIN' ? (
+                            <span className="text-muted small">
+                              {u._id === user?._id || u._id === user?.id ? 'Current Admin Session' : 'Admin Protected'}
+                            </span>
+                          ) : u.status === 'ACTIVE' ? (
+                            <button
+                              className="btn-secondary btn-sm"
+                              onClick={() => handleUserStatusUpdate(u._id, 'DEACTIVATED')}
+                            >
+                              <UserX size={14} style={{ marginRight: '4px' }} /> Deactivate
+                            </button>
                           ) : (
-                            <span className="text-muted small">Current Admin Session</span>
+                            <button
+                              className="btn-outline btn-sm"
+                              onClick={() => handleUserStatusUpdate(u._id, 'ACTIVE')}
+                            >
+                              <UserCheck size={14} style={{ marginRight: '4px' }} /> Activate
+                            </button>
                           )}
                         </td>
                       </tr>
@@ -715,6 +719,17 @@ const AdminDashboard = ({ user }) => {
                 </div>
 
                 <hr className="modal-divider" />
+
+                <div className="form-group">
+                  <label htmlFor="updateSubject">Complaint Subject / Title *</label>
+                  <input
+                    type="text"
+                    id="updateSubject"
+                    value={updateSubject}
+                    onChange={(e) => setUpdateSubject(e.target.value)}
+                    required
+                  />
+                </div>
 
                 <div className="form-group">
                   <label htmlFor="updateStatus">Update Status *</label>

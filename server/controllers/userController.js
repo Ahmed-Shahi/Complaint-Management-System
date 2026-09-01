@@ -65,23 +65,30 @@ const updateUserStatus = async (req, res) => {
       });
     }
 
-    const user = await User.findById(targetUserId);
-    if (!user) {
+    const targetUser = await User.findById(targetUserId);
+    if (!targetUser) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    user.status = status;
-    await user.save();
+    // Permission Check: Admins cannot deactivate or reject other Admin accounts
+    if (targetUser.role === 'ADMIN' && (status === 'DEACTIVATED' || status === 'REJECTED')) {
+      return res.status(403).json({ 
+        message: 'Permission denied: Administrators do not have permission to deactivate or reject other Admin accounts.' 
+      });
+    }
+
+    targetUser.status = status;
+    await targetUser.save();
 
     res.json({
       success: true,
-      message: `User '${user.name}' status updated to ${status}`,
+      message: `User '${targetUser.name}' status updated to ${status}`,
       user: {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        status: user.status
+        _id: targetUser._id,
+        name: targetUser.name,
+        email: targetUser.email,
+        role: targetUser.role,
+        status: targetUser.status
       }
     });
   } catch (error) {

@@ -10,14 +10,15 @@ dotenv.config();
 
 const app = express();
 
-// Ensure DB Connection per request (handles Vercel serverless cold starts)
+// Ensure DB Connection and initial data seeding
+connectDB().then(() => {
+  seedAdmin();
+});
+
 app.use(async (req, res, next) => {
   await connectDB();
   next();
 });
-
-// Seed default admin account
-seedAdmin();
 
 // CORS setup allowing credentials dynamically
 app.use(cors({

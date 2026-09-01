@@ -1,7 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import API from '../services/api';
 import StatusBadge from '../components/StatusBadge';
-import { PlusCircle, Search, FileText, Clock, CheckCircle2, XCircle, AlertCircle, Eye, RefreshCw } from 'lucide-react';
+import {
+  PlusCircle,
+  Search,
+  FileText,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  Eye,
+  RefreshCw,
+  Edit,
+  Trash2,
+  Lock
+} from 'lucide-react';
 
 const UserDashboard = ({ user }) => {
   const [complaints, setComplaints] = useState([]);
@@ -22,8 +35,17 @@ const UserDashboard = ({ user }) => {
     description: ''
   });
 
-  // Selected Complaint Modal
+  // Selected Complaint Detail Modal
   const [selectedComplaint, setSelectedComplaint] = useState(null);
+
+  // Edit Complaint Modal State
+  const [editingComplaint, setEditingComplaint] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    title: '',
+    category: '',
+    description: ''
+  });
+  const [updatingUserComplaint, setUpdatingUserComplaint] = useState(false);
 
   useEffect(() => {
     if (user?._id || user?.id) {
@@ -41,7 +63,6 @@ const UserDashboard = ({ user }) => {
       if (res.data.success) {
         const fetchedCats = res.data.categories || [];
         setCategories(fetchedCats);
-        console.log("Categories Fetched:", fetchedCats);
 
         if (fetchedCats.length > 0) {
           setNewComplaint((prev) => ({
@@ -77,6 +98,9 @@ const UserDashboard = ({ user }) => {
 
   const handleCreateComplaint = async (e) => {
     e.preventDefault();
+    const userId = user?._id || user?.id;
+    if (!userId) return;
+
     setErrorMsg('');
     setSuccessMsg('');
 
@@ -87,7 +111,7 @@ const UserDashboard = ({ user }) => {
 
     setSubmitting(true);
     try {
-      const res = await API.post(`/complaints/${user._id}`, {
+      const res = await API.post(`/complaints/${userId}`, {
         title: newComplaint.title,
         description: newComplaint.description,
         category: newComplaint.category
@@ -102,6 +126,67 @@ const UserDashboard = ({ user }) => {
       setErrorMsg(err.response?.data?.message || 'Failed to submit complaint');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // User Edit Pending Complaint Handler
+  const handleOpenEditModal = (item) => {
+    setEditingComplaint(item);
+    setEditFormData({
+      title: item.title,
+      category: item.category?._id || item.category || '',
+      description: item.description
+    });
+  };
+
+  const handleUserUpdateComplaint = async (e) => {
+    e.preventDefault();
+    const userId = user?._id || user?.id;
+    if (!userId || !editingComplaint) return;
+
+    setUpdatingUserComplaint(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      const res = await API.patch(`/complaints/${userId}/user-update/${editingComplaint._id}`, {
+        title: editFormData.title,
+        category: editFormData.category,
+        description: editFormData.description
+      });
+
+      if (res.data.success) {
+        setSuccessMsg(res.data.message || 'Complaint updated successfully!');
+        setEditingComplaint(null);
+        fetchMyComplaints();
+      }
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || 'Failed to update complaint');
+    } finally {
+      setUpdatingUserComplaint(false);
+    }
+  };
+
+  // User Delete Pending Complaint Handler
+  const handleUserDeleteComplaint = async (complaintId) => {
+    const userId = user?._id || user?.id;
+    if (!userId) return;
+
+    if (!window.confirm('Are you sure you want to delete this pending complaint?')) {
+      return;
+    }
+
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      const res = await API.delete(`/complaints/${userId}/user-delete/${complaintId}`);
+      if (res.data.success) {
+        setSuccessMsg(res.data.message || 'Complaint deleted successfully!');
+        fetchMyComplaints();
+      }
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || 'Failed to delete complaint');
     }
   };
 
@@ -287,7 +372,7 @@ const UserDashboard = ({ user }) => {
                     <th>Category</th>
                     <th>Date Submitted</th>
                     <th>Status</th>
-                    <th>Action</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -300,12 +385,39 @@ const UserDashboard = ({ user }) => {
                         <StatusBadge status={item.status} />
                       </td>
                       <td>
-                        <button
-                          className="btn-outline btn-sm"
-                          onClick={() => setSelectedComplaint(item)}
-                        >
-                          <Eye size={14} style={{ marginRight: '4px' }} /> View
-                        </button>
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                          <button
+                            className="btn-outline btn-sm"
+                            onClick={() => setSelectedComplaint(item)}
+                          >
+                            <Eye size={14} style={{ marginRight: '4px' }} /> View
+                          </button>
+
+                          {item.status === 'PENDING' ? (
+                            <>
+                              <button
+                                className="btn-secondary btn-sm"
+                                onClick={() => handleOpenEditModal(item)}
+                              >
+                                <Edit size={14} style={{ marginRight: '4px' }} /> Edit
+                              </button>
+                              <button
+                                className="btn-danger btn-sm"
+                                onClick={() => handleUserDeleteComplaint(item._id)}
+                              >
+                                <Trash2 size={14} style={{ marginRight: '4px' }} /> Delete
+                              </button>
+                            </>
+                          ) : (
+                            <span
+                              className="text-muted small"
+                              title="Complaints can only be edited or deleted while in PENDING status"
+                              style={{ display: 'flex', alignItems: 'center', gap: '2px', marginLeft: '4px' }}
+                            >
+                              <Lock size={12} /> Reviewed
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -316,7 +428,7 @@ const UserDashboard = ({ user }) => {
         </div>
       </div>
 
-      {/* Complaint Detail Modal */}
+      {/* View Complaint Detail Modal */}
       {selectedComplaint && (
         <div className="modal-backdrop" onClick={() => setSelectedComplaint(null)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
@@ -370,6 +482,75 @@ const UserDashboard = ({ user }) => {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* User Edit Complaint Modal */}
+      {editingComplaint && (
+        <div className="modal-backdrop" onClick={() => setEditingComplaint(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Edit Pending Complaint</h3>
+              <button className="btn-close" onClick={() => setEditingComplaint(null)}>
+                &times;
+              </button>
+            </div>
+
+            <form onSubmit={handleUserUpdateComplaint}>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label htmlFor="editCategory">Category *</label>
+                  <select
+                    id="editCategory"
+                    value={editFormData.category}
+                    onChange={(e) => setEditFormData({ ...editFormData, category: e.target.value })}
+                    required
+                  >
+                    {categories.map((cat) => (
+                      <option key={cat._id} value={cat._id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="editTitle">Subject / Title *</label>
+                  <input
+                    type="text"
+                    id="editTitle"
+                    value={editFormData.title}
+                    onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="editDescription">Description *</label>
+                  <textarea
+                    id="editDescription"
+                    rows={5}
+                    value={editFormData.description}
+                    onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setEditingComplaint(null)}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary" disabled={updatingUserComplaint}>
+                  {updatingUserComplaint ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

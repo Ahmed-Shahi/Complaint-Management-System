@@ -80,7 +80,6 @@ const getAllComplaints = async (req, res) => {
       .populate('userId', 'name email status')
       .sort({ createdAt: -1 });
 
-    // Client search filter across title, description, user name or user email
     if (search) {
       const term = search.toLowerCase();
       complaints = complaints.filter(c => 
@@ -116,7 +115,6 @@ const getComplaintDetail = async (req, res) => {
       return res.status(404).json({ message: 'Complaint not found' });
     }
 
-    // Verify user owns complaint or is Admin
     if (req.user.role !== 'ADMIN' && complaint.userId._id.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Access denied to this complaint' });
     }
@@ -130,16 +128,16 @@ const getComplaintDetail = async (req, res) => {
   }
 };
 
-// @desc    Update complaint status & add admin comments (Admin only)
+// @desc    Update complaint status, subject (title), category, and admin comment (Admin only)
 // @route   PATCH /api/complaints/:userId/status/:complaintId
 // @access  Protected (Admin)
 const updateComplaintStatus = async (req, res) => {
   try {
     const { complaintId } = req.params;
-    const { status, adminComment } = req.body;
+    const { status, adminComment, title, category } = req.body;
 
     const validStatuses = ['PENDING', 'IN_PROGRESS', 'RESOLVED', 'REJECTED'];
-    if (!status || !validStatuses.includes(status)) {
+    if (status && !validStatuses.includes(status)) {
       return res.status(400).json({ 
         message: `Invalid status. Allowed values: ${validStatuses.join(', ')}` 
       });
@@ -150,10 +148,11 @@ const updateComplaintStatus = async (req, res) => {
       return res.status(404).json({ message: 'Complaint not found' });
     }
 
-    complaint.status = status;
-    if (adminComment !== undefined) {
-      complaint.adminComment = adminComment;
-    }
+    if (status) complaint.status = status;
+    if (title && title.trim()) complaint.title = title.trim();
+    if (category) complaint.category = category;
+    if (adminComment !== undefined) complaint.adminComment = adminComment;
+
     await complaint.save();
 
     const updatedComplaint = await Complaint.findById(complaintId)
@@ -162,11 +161,88 @@ const updateComplaintStatus = async (req, res) => {
 
     res.json({
       success: true,
-      message: `Complaint status updated to ${status}`,
+      message: `Complaint updated successfully! Status: ${complaint.status}`,
       complaint: updatedComplaint
     });
   } catch (error) {
-    res.status(500).json({ message: 'Failed to update complaint status', error: error.message });
+    res.status(500).json({ message: 'Failed to update complaint', error: error.message });
+  }
+};
+
+// @desc    Update user's own complaint (Allowed ONLY if status === 'PENDING')
+// @route   PATCH /api/complaints/:userId/user-update/:complaintId
+// @access  Protected (User owner)
+const updateUserComplaint = async (req, res) => {
+  try {
+    const { complaintId } = req.params;
+    const { title, description, category } = req.body;
+
+    const complaint = await Complaint.findById(complaintId);
+    if (!complaint) {
+      return res.status(404).json({ message: 'Complaint not found' });
+    }
+
+    if (complaint.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Access denied: You can only edit your own complaints.' });
+    }
+
+    // Lock editing if status is no longer PENDING (i.e. Admin has reviewed it)
+    if (complaint.status !== 'PENDING') {
+      return res.status(403).json({ 
+        message: 'Editing locked: Complaints can only be edited while in PENDING status.' 
+      });
+    }
+
+    if (title) complaint.title = title.trim();
+    if (description) complaint.description = description.trim();
+    if (category) complaint.category = category;
+
+    await complaint.save();
+
+    const updatedComplaint = await Complaint.findById(complaintId)
+      .populate('category', 'name');
+
+    res.json({
+      success: true,
+      message: 'Complaint updated successfully!',
+      complaint: updatedComplaint
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to update complaint', error: error.message });
+  }
+};
+
+// @desc    Delete user's own complaint (Allowed ONLY if status === 'PENDING')
+// @route   DELETE /api/complaints/:userId/user-delete/:complaintId
+// @access  Protected (User owner)
+const deleteUserComplaint = async (req, res) => {
+  try {
+    const { complaintId } = req.params;
+
+    const complaint = await Complaint.findById(complaintId);
+    if (!complaint) {
+      return res.status(404).json({ message: 'Complaint not found' });
+    }
+
+    if (complaint.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Access denied: You can only delete your own complaints.' });
+    }
+
+    // Lock deletion if status is no longer PENDING
+    if (complaint.status !== 'PENDING') {
+      return res.status(403).json({ 
+        message: 'Deletion locked: Complaints can only be deleted while in PENDING status.' 
+      });
+    }
+
+    await Complaint.findByIdAndDelete(complaintId);
+
+    res.json({
+      success: true,
+      message: 'Complaint deleted successfully!'
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to delete complaint', error: error.message });
   }
 };
 
@@ -175,5 +251,7 @@ module.exports = {
   getMyComplaints,
   getAllComplaints,
   getComplaintDetail,
-  updateComplaintStatus
+  updateComplaintStatus,
+  updateUserComplaint,
+  deleteUserComplaint
 };
