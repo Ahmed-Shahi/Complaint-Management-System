@@ -93,10 +93,11 @@ const loginUser = async (req, res) => {
 
     // Save token cookie matching requirement Token_<userId>
     const cookieName = `Token_${user._id}`;
+    const isProd = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
     res.cookie(cookieName, token, {
       httpOnly: true,
-      sameSite: 'lax',
-      secure: false, // Set to true if HTTPS in production
+      sameSite: isProd ? 'none' : 'lax',
+      secure: isProd ? true : false,
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
@@ -123,7 +124,12 @@ const logoutUser = (req, res) => {
   const { userId } = req.params;
   if (userId) {
     const cookieName = `Token_${userId}`;
-    res.clearCookie(cookieName);
+    const isProd = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+    res.clearCookie(cookieName, {
+      httpOnly: true,
+      sameSite: isProd ? 'none' : 'lax',
+      secure: isProd ? true : false
+    });
   }
   res.json({ success: true, message: 'Logged out successfully' });
 };

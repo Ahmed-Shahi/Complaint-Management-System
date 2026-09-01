@@ -19,19 +19,11 @@ app.use(async (req, res, next) => {
 // Seed default admin account
 seedAdmin();
 
-// Middleware Setup
-const allowedOrigins = [
-  process.env.CLIENT_URL || 'http://localhost:5173',
-  'http://127.0.0.1:5173'
-];
-
+// CORS setup allowing credentials dynamically
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin) || process.env.VERCEL === '1') {
-      callback(null, true);
-    } else {
-      callback(null, true);
-    }
+    // Reflect request origin to support cross-domain credentials (cookie authentication)
+    callback(null, origin || true);
   },
   credentials: true
 }));
@@ -40,7 +32,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Route Mounts (Supports both /api/* and /* paths for Vercel serverless proxying)
+// Route Mounts (Supports both /api/* and /* paths)
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/auth', require('./routes/authRoutes'));
 
@@ -53,7 +45,7 @@ app.use('/categories', require('./routes/categoryRoutes'));
 app.use('/api/complaints', require('./routes/complaintRoutes'));
 app.use('/complaints', require('./routes/complaintRoutes'));
 
-// Health check endpoint (matches /api/health, /health, /api, and /)
+// Health check endpoint
 app.get(['/api/health', '/health', '/api', '/'], (req, res) => {
   res.json({ status: 'OK', message: 'Smart Complaint Management System API operational' });
 });
