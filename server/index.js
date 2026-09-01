@@ -10,11 +10,14 @@ dotenv.config();
 
 const app = express();
 
-// Database Connection
-connectDB().then(() => {
-  // Seed default admin account
-  seedAdmin();
+// Ensure DB Connection per request (handles Vercel serverless cold starts)
+app.use(async (req, res, next) => {
+  await connectDB();
+  next();
 });
+
+// Seed default admin account
+seedAdmin();
 
 // Middleware Setup
 const allowedOrigins = [
@@ -24,10 +27,10 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.includes(origin) || process.env.VERCEL === '1') {
       callback(null, true);
     } else {
-      callback(null, true); // Allow during local dev testing
+      callback(null, true);
     }
   },
   credentials: true
@@ -54,7 +57,12 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Internal Server Error', error: err.message });
 });
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
-});
+// Only listen locally, export app for Vercel Serverless
+if (process.env.VERCEL !== '1') {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+  });
+}
+
+module.exports = app;

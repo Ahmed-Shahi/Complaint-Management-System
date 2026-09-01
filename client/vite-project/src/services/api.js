@@ -1,8 +1,12 @@
 import axios from 'axios';
 
-// Base API configuration with credentials enabled for Token_<userId> cookies
+// Base API configuration
+// In local dev mode, uses http://localhost:5000/api
+// In Vercel production deployment, routes to relative /api
+const baseURL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:5000/api' : '/api');
+
 const API = axios.create({
-  baseURL: 'http://localhost:5000/api',
+  baseURL,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json'
