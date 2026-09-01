@@ -40,14 +40,21 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Route Mounts
+// Route Mounts (Supports both /api/* and /* paths for Vercel serverless proxying)
 app.use('/api/auth', require('./routes/authRoutes'));
-app.use('/api/users', require('./routes/userRoutes'));
-app.use('/api/categories', require('./routes/categoryRoutes'));
-app.use('/api/complaints', require('./routes/complaintRoutes'));
+app.use('/auth', require('./routes/authRoutes'));
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
+app.use('/api/users', require('./routes/userRoutes'));
+app.use('/users', require('./routes/userRoutes'));
+
+app.use('/api/categories', require('./routes/categoryRoutes'));
+app.use('/categories', require('./routes/categoryRoutes'));
+
+app.use('/api/complaints', require('./routes/complaintRoutes'));
+app.use('/complaints', require('./routes/complaintRoutes'));
+
+// Health check endpoint (matches /api/health, /health, /api, and /)
+app.get(['/api/health', '/health', '/api', '/'], (req, res) => {
   res.json({ status: 'OK', message: 'Smart Complaint Management System API operational' });
 });
 
